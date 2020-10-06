@@ -1,2 +1,2 @@
 make: isabot.cpp
-	gcc -o isabot isabot.cpp -lssl -lcrypto
+	g++ -o isabot isabot.cpp -lssl -lcrypto -std=c++11

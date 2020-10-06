@@ -15,7 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h> 
+#include <sys/types.h>
+#include<vector>
 
 using namespace std;
     
@@ -23,6 +24,21 @@ SSL *ssl;
 int sock;
 int timeout = 1000;
 int finalLen = 0;
+
+
+std::vector<char> jsonResponse;
+std::vector<char> bracketStack;
+
+void parseJsonResponse() {
+    std::vector<char> tmp;
+
+    for (size_t i = 0; i < jsonResponse.size(); i++)
+    {
+        
+    }
+    
+ }
+
 
 bool checkCR(char c) {
     if (c == 13) //CR = 13 ASCII
@@ -48,6 +64,20 @@ bool checkZero(char c) {
     return false;
 }
 
+void checkForBegginingOfJson(char *buf,int len) {
+    bool inJson = false;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        if (buf[i] == '[' || inJson)
+        {
+            jsonResponse.push_back(buf[i]);
+            inJson = true;
+        }
+        
+    }    
+}
+
 //CRLFCRLF
 bool checkEndOfHead(char *buf,int len) {
     for (size_t i = 0; i < len; i++)
@@ -58,10 +88,11 @@ bool checkEndOfHead(char *buf,int len) {
             {
                 if (checkCR(buf[i+2]))
                 {
-                    if (checkLF(buf[i+3]))
+                    if (checkLF(buf[i+3]))   
                     {
                         finalLen += len;
-                        printf("%s",buf);
+                        checkForBegginingOfJson(buf,len);
+                        //printf("%s",buf);
                         return true;
                     }
                     
@@ -102,6 +133,14 @@ bool checkEndOfMessage(char *buf,int len) {
     
 }
 
+void addToJsonResonse(char *buf,int len) {
+    for (size_t i = 0; i < len; i++)
+    {
+        jsonResponse.push_back(buf[i]);
+    }
+    
+}
+
 int RecvPacket()
 {
     int len=100;
@@ -119,22 +158,30 @@ int RecvPacket()
             {
                 bodyFlag = true;
             }
-            
         }
         else {
-            finalLen += len;
-            printf("%s",buf);
+            if (checkEndOfMessage(buf,len) || len < 0) {
+                break;
+            } 
+            else {
+                finalLen += len;
+                addToJsonResonse(buf,len);
+                //printf("%s",buf); 
+            }
         }        
-        if (checkEndOfMessage(buf,len))
-        {
-            break;
-        }     
    }
 
-    printf("finallen je : %i \n",finalLen);
+    for (size_t i = 0; i < jsonResponse.size(); i++)
+    {
+        printf("%c",jsonResponse.at(i));
+    }
 
-    printf("finished reading \n");
+    //printf("finallen je : %i + velikost vectoru je : %i\n",finalLen,jsonResponse.size());
 
+    printf("\n\nfinished reading \nGoing to parseing \n");
+    
+
+/*
     if (len < 0) {
         int err = SSL_get_error(ssl, len);
     if (err == SSL_ERROR_WANT_READ)
@@ -144,8 +191,9 @@ int RecvPacket()
         if (err == SSL_ERROR_ZERO_RETURN || err == SSL_ERROR_SYSCALL || err == SSL_ERROR_SSL)
             return -1;
     }
+*/
 }
-    
+   
 int SendPacket(const char *buf)
 {
     int len = SSL_write(ssl, buf, strlen(buf));
@@ -172,7 +220,6 @@ void log_ssl()
         char *str = ERR_error_string(err, 0);
         if (!str)
             return;
-        printf(str);
         printf("\n");
         fflush(stdout);
     }
