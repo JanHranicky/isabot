@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include<vector>
+#include<string>
 
 using namespace std;
     
@@ -69,7 +70,7 @@ void checkForBegginingOfJson(char *buf,int len) {
 
     for (size_t i = 0; i < len; i++)
     {
-        if (buf[i] == '[' || inJson)
+        if (buf[i] == '[' || buf[i] == '{' || inJson)
         {
             jsonResponse.push_back(buf[i]);
             inJson = true;
@@ -166,7 +167,6 @@ int RecvPacket()
             else {
                 finalLen += len;
                 addToJsonResonse(buf,len);
-                //printf("%s",buf); 
             }
         }        
    }
@@ -179,7 +179,7 @@ int RecvPacket()
     //printf("finallen je : %i + velikost vectoru je : %i\n",finalLen,jsonResponse.size());
 
     printf("\n\nfinished reading \nGoing to parseing \n");
-    
+    jsonResponse.clear();
 
 /*
     if (len < 0) {
@@ -194,9 +194,11 @@ int RecvPacket()
 */
 }
    
-int SendPacket(const char *buf)
+int SendPacket(string request)
 {
-    int len = SSL_write(ssl, buf, strlen(buf));
+    const void * a = request.c_str();
+    int len = SSL_write(ssl, a, request.length());
+    //int len = SSL_write(ssl, &request, request.length());
     if (len < 0) {
         int err = SSL_get_error(ssl, len);
         switch (err) {
@@ -267,19 +269,14 @@ int main(int argc, char *argv[])
     }
     printf ("SSL connection using %s\n", SSL_get_cipher (ssl));
 
+
     while (1)
     {
         char input;
-        scanf("%c", &input);
-        printf("press n to send another get request \n");
-        if(input == 'n') {
-            char *request = "GET /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n"; 
-            SendPacket(request);
-            RecvPacket();
-        }
+        string request = "GET /api/channels/720745314209890379 HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n"; 
+        SendPacket(request);
+        RecvPacket();        
     }
     
-
-
     return 0;
 }
