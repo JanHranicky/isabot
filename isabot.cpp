@@ -19,6 +19,8 @@
 #include<vector>
 #include<string>
 
+#include"jsonParser.hpp"
+
 using namespace std;
     
 SSL *ssl;
@@ -27,19 +29,9 @@ int timeout = 1000;
 int finalLen = 0;
 
 
-std::vector<char> jsonResponse;
-std::vector<char> bracketStack;
-
-void parseJsonResponse() {
-    std::vector<char> tmp;
-
-    for (size_t i = 0; i < jsonResponse.size(); i++)
-    {
-        
-    }
-    
- }
-
+string jsonResponse;
+string lastMessgeId;
+string stopMessage;
 
 bool checkCR(char c) {
     if (c == 13) //CR = 13 ASCII
@@ -142,19 +134,44 @@ void addToJsonResonse(char *buf,int len) {
     
 }
 
+bool parseHead(char *buf,int len,string returnCode) { //9  10 11
+    printf("inside parse head buf: %s",buf);
+    string returnCodeString = "";
+    returnCodeString.push_back(buf[9]);
+    returnCodeString.push_back(buf[10]);
+    returnCodeString.push_back(buf[11]);
+    
+    if (returnCodeString == returnCode)
+    {
+        return true;
+    }
+    return false;
+    
+}
+
 int RecvPacket()
 {
     int len=100;
     char buf[1000000];
 
    bool bodyFlag = false;
-
+   bool parsedHead = false;
    while (1)
    {
         len=SSL_read(ssl, buf, 100);
         buf[len]=0;
+
         if (!bodyFlag)
-        {
+        {           
+            if (!parsedHead)
+            {
+                if (!parseHead(buf,len,"200"))
+                {
+                    break;
+                }
+                parsedHead = true;
+            }
+            
             if (checkEndOfHead(buf,len))
             {
                 bodyFlag = true;
@@ -167,18 +184,34 @@ int RecvPacket()
             else {
                 finalLen += len;
                 addToJsonResonse(buf,len);
+                //printf("%s",jsonResponse.c_str());                
             }
         }        
    }
-
-    for (size_t i = 0; i < jsonResponse.size(); i++)
-    {
-        printf("%c",jsonResponse.at(i));
-    }
-
     //printf("finallen je : %i + velikost vectoru je : %i\n",finalLen,jsonResponse.size());
+    //printf("\n\nfinished reading \nGoing to parseing \n");
 
-    printf("\n\nfinished reading \nGoing to parseing \n");
+    string newLast = getLastMessageId(jsonResponse);  
+    if (lastMessgeId.empty())
+    {
+        lastMessgeId = newLast;
+    }
+    else
+    {
+        if (lastMessgeId != newLast)
+        {
+            printf("GOING TO READ NEW MESSAGES \n\n");
+            stopMessage = lastMessgeId;
+            lastMessgeId = newLast;
+            printf("last message : %s\n",lastMessgeId.c_str());
+            printf("stop message : %s\n",stopMessage.c_str());
+            return 1; //get new messages
+        }
+    }
+    
+    
+    //printf("%s <- last message id \n",getLastMessageId(jsonResponse).c_str());
+
     jsonResponse.clear();
 
 /*
@@ -192,6 +225,7 @@ int RecvPacket()
             return -1;
     }
 */
+    return 0;
 }
    
 int SendPacket(string request)
@@ -269,13 +303,25 @@ int main(int argc, char *argv[])
     }
     printf ("SSL connection using %s\n", SSL_get_cipher (ssl));
 
-
+    int counter = 0;
+    int recvReturnCode = 0;
     while (1)
     {
-        char input;
-        string request = "GET /api/channels/720745314209890379 HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n"; 
-        SendPacket(request);
-        RecvPacket();        
+        if (recvReturnCode == 0)
+        {
+            string request = "GET /api/channels/720745314209890379 HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n"; 
+            SendPacket(request);
+            recvReturnCode = RecvPacket();      
+        }
+        else if (recvReturnCode == 1)
+        {
+            string request = "GET /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n"; 
+            SendPacket(request);
+            recvReturnCode = RecvPacket();
+        }
+        
+        counter ++;
+        printf("end of loop %i\n",counter);  
     }
     
     return 0;
