@@ -16,24 +16,25 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include<vector>
-#include<string>
+#include <vector>
+#include <string>
 
-#include"jsonParser.hpp"
+#include "jsonParser.hpp"
 
 using namespace std;
-    
+
 SSL *ssl;
 int sock;
 int timeout = 1000;
 int finalLen = 0;
 
-
-string jsonResponse;
 string lastMessgeId;
 string stopMessage;
 
-bool checkCR(char c) {
+bool goodCode = true;
+
+bool checkCR(char c)
+{
     if (c == 13) //CR = 13 ASCII
     {
         return true;
@@ -41,7 +42,8 @@ bool checkCR(char c) {
     return false;
 }
 
-bool checkLF(char c) {
+bool checkLF(char c)
+{
     if (c == 10) //LF = 10 ASCII
     {
         return true;
@@ -49,7 +51,8 @@ bool checkLF(char c) {
     return false;
 }
 
-bool checkZero(char c) {
+bool checkZero(char c)
+{
     if (c == 48)
     {
         return true;
@@ -57,141 +60,94 @@ bool checkZero(char c) {
     return false;
 }
 
-void checkForBegginingOfJson(char *buf,int len) {
+void checkForBegginingOfJson(char *buf, int len, string *jsonResponse)
+{
     bool inJson = false;
 
     for (size_t i = 0; i < len; i++)
     {
         if (buf[i] == '[' || buf[i] == '{' || inJson)
         {
-            jsonResponse.push_back(buf[i]);
+            jsonResponse->push_back(buf[i]);
             inJson = true;
         }
-        
-    }    
+    }
 }
 
 //CRLFCRLF
-bool checkEndOfHead(char *buf,int len) {
+bool checkEndOfHead(char *buf, int len, string *jsonResponse)
+{
     for (size_t i = 0; i < len; i++)
     {
-        if (checkCR(buf[i]) && i+3 < len)
+        if (checkCR(buf[i]) && i + 3 < len)
         {
-            if (checkLF(buf[i+1]))
+            if (checkLF(buf[i + 1]))
             {
-                if (checkCR(buf[i+2]))
+                if (checkCR(buf[i + 2]))
                 {
-                    if (checkLF(buf[i+3]))   
+                    if (checkLF(buf[i + 3]))
                     {
                         finalLen += len;
-                        checkForBegginingOfJson(buf,len);
+                        checkForBegginingOfJson(buf, len, jsonResponse);
                         //printf("%s",buf);
                         return true;
                     }
-                    
                 }
-                
             }
-            
         }
-        
     }
     return false;
 }
 //0CRLFCRLF
-bool checkEndOfMessage(char *buf,int len) {
+bool checkEndOfMessage(char *buf, int len)
+{
     for (size_t i = 0; i < len; i++)
     {
-        if (checkZero(buf[i]) && i+4 < len)
+        if (checkZero(buf[i]) && i + 4 < len)
         {
-            if (checkCR(buf[i+1]))
+            if (checkCR(buf[i + 1]))
             {
-                if (checkLF(buf[i+2]))
+                if (checkLF(buf[i + 2]))
                 {
-                    if (checkCR(buf[i+3]))
+                    if (checkCR(buf[i + 3]))
                     {
-                        if (checkLF(buf[i+4]))
+                        if (checkLF(buf[i + 4]))
                         {
                             return true;
                         }
-                        
                     }
-                    
                 }
-                
             }
-        } 
+        }
     }
     return false;
-    
 }
 
-void addToJsonResonse(char *buf,int len) {
+void addToJsonResonse(char *buf, int len, string *jsonResponse)
+{
     for (size_t i = 0; i < len; i++)
     {
-        jsonResponse.push_back(buf[i]);
+        jsonResponse->push_back(buf[i]);
     }
-    
 }
 
-bool parseHead(char *buf,int len,string returnCode) { //9  10 11
-    printf("inside parse head buf: %s",buf);
+bool parseHead(char *buf, int len, string returnCode)
+{ //9  10 11
     string returnCodeString = "";
     returnCodeString.push_back(buf[9]);
     returnCodeString.push_back(buf[10]);
     returnCodeString.push_back(buf[11]);
-    
+
     if (returnCodeString == returnCode)
     {
         return true;
     }
     return false;
-    
 }
 
-int RecvPacket()
+bool checkNewMessages(string jsonResponse)
 {
-    int len=100;
-    char buf[1000000];
-
-   bool bodyFlag = false;
-   bool parsedHead = false;
-   while (1)
-   {
-        len=SSL_read(ssl, buf, 100);
-        buf[len]=0;
-
-        if (!bodyFlag)
-        {           
-            if (!parsedHead)
-            {
-                if (!parseHead(buf,len,"200"))
-                {
-                    break;
-                }
-                parsedHead = true;
-            }
-            
-            if (checkEndOfHead(buf,len))
-            {
-                bodyFlag = true;
-            }
-        }
-        else {
-            if (checkEndOfMessage(buf,len) || len < 0) {
-                break;
-            } 
-            else {
-                finalLen += len;
-                addToJsonResonse(buf,len);
-                //printf("%s",jsonResponse.c_str());                
-            }
-        }        
-   }
-    //printf("finallen je : %i + velikost vectoru je : %i\n",finalLen,jsonResponse.size());
-    //printf("\n\nfinished reading \nGoing to parseing \n");
-
-    string newLast = getLastMessageId(jsonResponse);  
+    string newLast = getLastMessageId(jsonResponse);
     if (lastMessgeId.empty())
     {
         lastMessgeId = newLast;
@@ -203,18 +159,119 @@ int RecvPacket()
             printf("GOING TO READ NEW MESSAGES \n\n");
             stopMessage = lastMessgeId;
             lastMessgeId = newLast;
-            printf("last message : %s\n",lastMessgeId.c_str());
-            printf("stop message : %s\n",stopMessage.c_str());
-            return 1; //get new messages
+
+            printf("last message : %s\n", lastMessgeId.c_str());
+            printf("stop message : %s\n", stopMessage.c_str());
+            return true; //get new messages
         }
     }
-    
-    
+    return false;
+}
+
+bool checkCRLFCRLF(char *buf, int len)
+{
+    for (size_t i = 0; i < len; i++)
+    {
+        if (checkCR(buf[i + 1]))
+        {
+            if (checkLF(buf[i + 2]))
+            {
+                if (checkCR(buf[i + 3]))
+                {
+                    if (checkLF(buf[i + 4]))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+void readRestOfFailedResponse()
+{
+    char buf[150];
+    int len = 100;
+
+    bool readingHead = true;
+    bool readLenght = false;
+    string head;
+    string contentLenght;
+    string test;
+    while (1)
+    {
+        len = SSL_read(ssl, buf, 100);
+        buf[len] = 0;
+
+        if (checkCRLFCRLF(buf, len))
+        {
+            if (checkCRLFCRLF(buf, len))
+            {
+                return;
+            }
+        }
+    }
+}
+
+string RecvPacket()
+{
+    string jsonResponse;
+    int len = 100;
+    char buf[1000000];
+
+    bool bodyFlag = false;
+    bool parsedHead = false;
+    while (1)
+    {
+        len = SSL_read(ssl, buf, 100);
+        buf[len] = 0;
+        //printf("%s",buf);
+
+        if (!bodyFlag)
+        {
+            if (!parsedHead)
+            {
+                if (!parseHead(buf, len, "200"))
+                {
+                    goodCode = false;
+                    //printf("%s",buf);
+                    //printf("BREAKING CAUSE OF BAD CODE \n\n\n");
+                    //TODO READ MSG ON SOCKET)
+                    readRestOfFailedResponse();
+                    break;
+                }
+                goodCode = true;
+                parsedHead = true;
+            }
+
+            if (checkEndOfHead(buf, len, &jsonResponse))
+            {
+                bodyFlag = true;
+            }
+        }
+        else
+        {
+            if (checkEndOfMessage(buf, len) || len < 0)
+            {
+                break;
+            }
+            else
+            {
+                finalLen += len;
+                addToJsonResonse(buf, len, &jsonResponse);
+                //printf("%s",jsonResponse.c_str());
+            }
+        }
+    }
+    //printf("finallen je : %i + velikost vectoru je : %i\n",finalLen,jsonResponse.size());
+    //printf("\n\nfinished reading \nGoing to parseing \n");
+
+    return jsonResponse;
+
     //printf("%s <- last message id \n",getLastMessageId(jsonResponse).c_str());
 
-    jsonResponse.clear();
-
-/*
+    /*
     if (len < 0) {
         int err = SSL_get_error(ssl, len);
     if (err == SSL_ERROR_WANT_READ)
@@ -225,17 +282,18 @@ int RecvPacket()
             return -1;
     }
 */
-    return 0;
 }
-   
+
 int SendPacket(string request)
 {
-    const void * a = request.c_str();
+    const void *a = request.c_str();
     int len = SSL_write(ssl, a, request.length());
     //int len = SSL_write(ssl, &request, request.length());
-    if (len < 0) {
+    if (len < 0)
+    {
         int err = SSL_get_error(ssl, len);
-        switch (err) {
+        switch (err)
+        {
         case SSL_ERROR_WANT_WRITE:
             return 0;
         case SSL_ERROR_WANT_READ:
@@ -248,11 +306,12 @@ int SendPacket(string request)
         }
     }
 }
-    
+
 void log_ssl()
 {
     int err;
-    while (err = ERR_get_error()) {
+    while (err = ERR_get_error())
+    {
         char *str = ERR_error_string(err, 0);
         if (!str)
             return;
@@ -260,69 +319,112 @@ void log_ssl()
         fflush(stdout);
     }
 }
-    
-int main(int argc, char *argv[])
+
+void initSSL()
 {
     int s;
     s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0) {
+    if (s < 0)
+    {
         printf("Error creating socket.\n");
-        return -1;
+        exit(-1);
     }
     struct sockaddr_in sa;
-    memset (&sa, 0, sizeof(sa));
-    sa.sin_family      = AF_INET;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
     sa.sin_addr.s_addr = inet_addr("162.159.138.232"); // discord ip
-    sa.sin_port        = htons (443); 
+    sa.sin_port = htons(443);
     socklen_t socklen = sizeof(sa);
-    if (connect(s, (struct sockaddr *)&sa, socklen)) {
+    if (connect(s, (struct sockaddr *)&sa, socklen))
+    {
         printf("Error connecting to server.\n");
-        return -1;
+        exit(-1);
     }
     SSL_library_init();
     SSLeay_add_ssl_algorithms();
     SSL_load_error_strings();
     const SSL_METHOD *meth = TLSv1_2_client_method();
-    SSL_CTX *ctx = SSL_CTX_new (meth);
-    ssl = SSL_new (ctx);
+    SSL_CTX *ctx = SSL_CTX_new(meth);
+    ssl = SSL_new(ctx);
 
-
-    if (!ssl) {
+    if (!ssl)
+    {
         printf("Error creating SSL.\n");
         log_ssl();
-        return -1;
+        exit(-1);
     }
     sock = SSL_get_fd(ssl);
     SSL_set_fd(ssl, s);
     int err = SSL_connect(ssl);
-    if (err <= 0) {
+    if (err <= 0)
+    {
         printf("Error creating SSL connection.  err=%x\n", err);
         log_ssl();
         fflush(stdout);
-        return -1;
+        exit(-1);
     }
-    printf ("SSL connection using %s\n", SSL_get_cipher (ssl));
+    printf("SSL connection using %s\n", SSL_get_cipher(ssl));
+}
+
+int countNewMessages(std::vector<string> messageVector)
+{
+    for (size_t i = 0; i < messageVector.size(); i++)
+    {
+        if (messageVector.at(i) == stopMessage)
+        {
+            return i;
+        }
+    }
+    return messageVector.size();
+}
+
+int main(int argc, char *argv[])
+{
+    initSSL();
 
     int counter = 0;
     int recvReturnCode = 0;
     while (1)
     {
-        if (recvReturnCode == 0)
+        string request = "GET /api/channels/720745314209890379 HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
+        SendPacket(request);
+        string jsonResponse = RecvPacket();
+        char inputChar;
+        scanf("%c", &inputChar);
+        if (inputChar == 'n')
         {
-            string request = "GET /api/channels/720745314209890379 HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n"; 
+            string request = "POST /api/channels/720745314209890379/webhooks HTTP/1.1\r\nHost: discord.com\r\nContent-Lenght: 41\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\nContent-Type: application/json\r\n\r\n{\"name\":\"isaBotHook\",\"avatar\":\"\"}\r\n";
             SendPacket(request);
-            recvReturnCode = RecvPacket();      
+            char buf[120];
+            int len = 100;
+            while (1)
+            {
+                len = SSL_read(ssl, buf, 100);
+                buf[len] = 0;
+                printf("%s",buf);
+            }
         }
+
+        if (goodCode && checkNewMessages(jsonResponse))
+        {
+            string request = "GET /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
+            SendPacket(request);
+            string messages = RecvPacket();
+            std::vector<string> messageVector = parseMessages(messages);
+            printf("new messages : %i \n", countNewMessages(messageVector));
+            //printf("%s", messages.c_str());
+        }
+        /*
         else if (recvReturnCode == 1)
         {
             string request = "GET /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n"; 
             SendPacket(request);
             recvReturnCode = RecvPacket();
         }
-        
-        counter ++;
-        printf("end of loop %i\n",counter);  
+        */
+        counter++;
+        printf("end of loop %i\n", counter);
     }
-    
+
     return 0;
 }
