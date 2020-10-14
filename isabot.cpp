@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <vector>
 #include <string>
+#include <regex>
 
 #include "jsonParser.hpp"
 
@@ -378,6 +379,47 @@ int countNewMessages(std::vector<string> messageVector)
     return messageVector.size();
 }
 
+void requestChannelInfo() {
+    string request = "GET /api/channels/720745314209890379 HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
+    SendPacket(request);
+}
+
+string getFirstLine(char buf[]) {
+    
+    string s = "";
+    int counter = 0;
+
+    while (buf[counter] != 10)
+    {
+        s += buf[counter];
+        counter ++;
+    }
+    return s;
+}
+
+void parseChannelInfo() { //returns last message id
+    char buf[101];
+    int len = 100;
+
+    bool parsedHead = false;
+    while (1)
+    {   
+        len = SSL_read(ssl, buf, 100);
+        buf[len] = 0;
+
+        if (!parsedHead)
+        {
+            string code = getFirstLine(buf);
+            printf("%s",code.c_str());
+            parsedHead = true;
+            
+        }
+        
+    }
+    
+
+}
+
 int main(int argc, char *argv[])
 {
     initSSL();
@@ -386,24 +428,9 @@ int main(int argc, char *argv[])
     int recvReturnCode = 0;
     while (1)
     {
-        string request = "GET /api/channels/720745314209890379 HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
-        SendPacket(request);
+        requestChannelInfo();
+        parseChannelInfo();
         string jsonResponse = RecvPacket();
-        char inputChar;
-        scanf("%c", &inputChar);
-        if (inputChar == 'n')
-        {
-            string request = "POST /api/channels/720745314209890379/webhooks HTTP/1.1\r\nHost: discord.com\r\nContent-Lenght: 41\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\nContent-Type: application/json\r\n\r\n{\"name\":\"isaBotHook\",\"avatar\":\"\"}\r\n";
-            SendPacket(request);
-            char buf[120];
-            int len = 100;
-            while (1)
-            {
-                len = SSL_read(ssl, buf, 100);
-                buf[len] = 0;
-                printf("%s",buf);
-            }
-        }
 
         if (goodCode && checkNewMessages(jsonResponse))
         {
