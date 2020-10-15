@@ -417,8 +417,9 @@ bool check200OK(string s) {
 
 bool checkEndOfMessage(string s) {
     std::regex endRegex("^0\\r\\n\\r\\n");
+    std::regex endRegex02("\n}\n");
 
-    if (std::regex_search(s,endRegex))
+    if (std::regex_search(s,endRegex) || std::regex_search(s,endRegex02))
     {
         return true;
     }
@@ -490,37 +491,41 @@ string parseChannelInfo() { //returns last message id
     return getLastMessageId(parsedResponse.at(1));
 }
 
-void parseChannelMessages() {
-    char buf[101];
+string parseChannelMessages() {
+    string channelMessagesResponse;
+
+    char buf[200];
     int len = 100;
 
-    bool ok = true;
+    bool code200Ok = true;
     bool checkedHead = false;
     while (1)
     {   
         len = SSL_read(ssl, buf, 100);
         buf[len] = 0;
-        printf("%s",buf);
+        //printf("%s",buf);
 
         if (!checkedHead)
         {
             if (!check200OK(convertToString(buf,len)))
             {
-                ok = false;
+                code200Ok = false;
             }
             checkedHead = true;
         }
-        
-        
-        if (!ok)
-        {
-            string converted = convertToString(buf,len);
-        }
-        
-        if (checkEndOfMessage(convertToString(buf,len)))
-        {
-            //printf("%s",messageString.c_str());
-            break;
+        else {
+            if(code200Ok) {
+                channelMessagesResponse += convertToString(buf,len);
+            }
+            if (checkEndOfMessage(convertToString(buf,len)))
+            {
+                if (!channelMessagesResponse.empty())
+                {
+                    return splitString(channelMessagesResponse,"\r\n\r\n").at(1).c_str();
+                }
+                
+                return channelMessagesResponse;
+            }
         }
     }   
 }
@@ -544,7 +549,12 @@ int main(int argc, char *argv[])
         else if(lastMessgeId != msId){
             printf("new messages \n");
             requestChannelMessages();
-            parseChannelMessages();
+            string messages = parseChannelMessages();
+            if (!messages.empty()) //react to all messages
+            {
+                printf("%s",messages.c_str());
+            }
+            
             //check new msg count
         }
         /*
