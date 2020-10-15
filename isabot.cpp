@@ -19,6 +19,7 @@
 #include <vector>
 #include <string>
 #include <regex>
+#include <iostream>
 
 #include "jsonParser.hpp"
 
@@ -384,6 +385,11 @@ void requestChannelInfo() {
     SendPacket(request);
 }
 
+void requestChannelMessages() {
+    string request = "GET /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
+    SendPacket(request);
+}
+
 string getFirstLine(char buf[]) {
     
     string s = "";
@@ -394,30 +400,129 @@ string getFirstLine(char buf[]) {
         s += buf[counter];
         counter ++;
     }
+
     return s;
 }
 
-void parseChannelInfo() { //returns last message id
+bool check200OK(string s) {
+     std::regex codeRegex("^HTTP/1.1 200 OK");
+
+    if (std::regex_search(s,codeRegex))
+    {
+        return true;
+    }
+
+    return false;        
+}
+
+bool checkEndOfMessage(string s) {
+    std::regex endRegex("^0\\r\\n\\r\\n");
+
+    if (std::regex_search(s,endRegex))
+    {
+        return true;
+    }
+    
+    return false;
+    
+}
+
+string convertToString(char buf[],int len) {
+    string converted;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        converted.push_back(buf[i]);
+    }
+
+    return converted;
+}
+
+std::vector<string> splitString(string s, string delimiter) {
+    std::vector<string> returnVector;
+    int pos = 0;
+    string token;
+
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token = s.substr(0, pos);
+        returnVector.push_back(token);
+        s.erase(0, pos + delimiter.length());
+    }
+
+    return returnVector;
+}
+
+string parseChannelInfo() { //returns last message id
     char buf[101];
     int len = 100;
 
     bool parsedHead = false;
+    string messageString;
     while (1)
     {   
         len = SSL_read(ssl, buf, 100);
         buf[len] = 0;
-
+        //printf("%s",buf);
         if (!parsedHead)
         {
-            string code = getFirstLine(buf);
-            printf("%s",code.c_str());
-            parsedHead = true;
+            if (!check200OK(convertToString(buf,len)));
+            {
+                //TODO 
+            }
             
+            parsedHead = true;
+        }
+        else {
+            string converted = convertToString(buf,len); 
+            messageString += converted;
+            if (checkEndOfMessage(convertToString(buf,len)))
+            {
+                //printf("%s",messageString.c_str());
+                break;
+            }
+        }
+    }
+    //printf("%s",messageString.c_str());
+
+    std::vector<string> parsedResponse;
+    parsedResponse = splitString(messageString,"\r\n\r\n");
+
+    return getLastMessageId(parsedResponse.at(1));
+}
+
+void parseChannelMessages() {
+    char buf[101];
+    int len = 100;
+
+    bool ok = true;
+    bool checkedHead = false;
+    while (1)
+    {   
+        len = SSL_read(ssl, buf, 100);
+        buf[len] = 0;
+        printf("%s",buf);
+
+        if (!checkedHead)
+        {
+            if (!check200OK(convertToString(buf,len)))
+            {
+                ok = false;
+            }
+            checkedHead = true;
         }
         
-    }
-    
-
+        
+        if (!ok)
+        {
+            string converted = convertToString(buf,len);
+        }
+        
+        if (checkEndOfMessage(convertToString(buf,len)))
+        {
+            //printf("%s",messageString.c_str());
+            break;
+        }
+    }   
 }
 
 int main(int argc, char *argv[])
@@ -429,7 +534,20 @@ int main(int argc, char *argv[])
     while (1)
     {
         requestChannelInfo();
-        parseChannelInfo();
+        string msId = parseChannelInfo();
+
+        if (lastMessgeId.empty())
+        {
+            printf("seting new msid \n");
+            lastMessgeId = msId;
+        }
+        else if(lastMessgeId != msId){
+            printf("new messages \n");
+            requestChannelMessages();
+            parseChannelMessages();
+            //check new msg count
+        }
+        /*
         string jsonResponse = RecvPacket();
 
         if (goodCode && checkNewMessages(jsonResponse))
@@ -448,9 +566,9 @@ int main(int argc, char *argv[])
             SendPacket(request);
             recvReturnCode = RecvPacket();
         }
-        */
         counter++;
         printf("end of loop %i\n", counter);
+        */
     }
 
     return 0;
