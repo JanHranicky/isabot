@@ -23,13 +23,21 @@ std::pair<int,string> betweenTest(std::string const &in,
   return returnPair;
 }
 
-std::vector<string> parseMessages(string jsonMessages) {
+  std::map<string,std::vector<string>> parseMessages(string jsonMessages) {
+  std::map<string,std::vector<string>> parsedMessages;
+
   int beg = 0;
   string pomMessages = jsonMessages;
 
   string before = ", {\"id\": \"";
   string after = "\", \"type\":";
   string beforeFirst = "\"id\": \"";
+
+  string beforeContent = "\"content\": \"";
+  string afterContent = "\", \"channel_id\":";
+
+  string beforeUserName = "\"username\": \"";
+  string afterUserName = "\", \"avatar\":";
 
   std::pair<int,string> returnPair;
   std::vector<string> ids;
@@ -45,8 +53,13 @@ std::vector<string> parseMessages(string jsonMessages) {
     else {
       returnPair = betweenTest(pomMessages,before,after);
     }
+    std::vector<string> msgContent;
+    msgContent.push_back(between(pomMessages,beforeContent,afterContent));
+    msgContent.push_back(between(pomMessages,beforeUserName,afterUserName));
 
-    ids.push_back(returnPair.second);
+    parsedMessages.emplace(std::make_pair(returnPair.second,msgContent));
+
+    //ids.push_back(returnPair.second);
 
     pomMessages = pomMessages.substr(returnPair.first,pomMessages.length());
     //printf("%s \n\n",pomMessages.c_str());
@@ -55,5 +68,5 @@ std::vector<string> parseMessages(string jsonMessages) {
     size = pomMessages.size();
   }
     
-  return ids;
+  return parsedMessages;
 }

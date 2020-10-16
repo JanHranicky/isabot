@@ -491,7 +491,7 @@ string parseChannelInfo() { //returns last message id
     return getLastMessageId(parsedResponse.at(1));
 }
 
-string parseChannelMessages() {
+string getChannelMessages() {
     string channelMessagesResponse;
 
     char buf[200];
@@ -549,12 +549,19 @@ int main(int argc, char *argv[])
         else if(lastMessgeId != msId){
             printf("new messages \n");
             requestChannelMessages();
-            string messages = parseChannelMessages();
+            string messages = getChannelMessages();
             if (!messages.empty()) //react to all messages
             {
                 printf("%s",messages.c_str());
+                printf("seting new msid \n");
+                std::map<string,std::vector<string>> parsedMsg = parseMessages(messages);
+
+                for (auto const& pair : parsedMsg) {
+                    auto key = pair.first;
+                    printf("msgid : %s content : %s username : %s \n",key.c_str(),pair.second.at(0).c_str(),pair.second.at(1).c_str());
+                    // etc. etc.
+                }      
             }
-            
             //check new msg count
         }
         /*
