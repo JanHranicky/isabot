@@ -530,9 +530,47 @@ string getChannelMessages() {
     }   
 }
 
+void postMessage() {
+    string request = "POST /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nContent-Type: application/json\r\nContent-Length: 153\r\nCache-Control: no-cache\r\n\r\n{\"content\": \"Hello, World!\",\n\"tts\": false,\n\"embed\": {\n\"title\": \"Hello, Embed!\",\n\"description\": \"This is an embedded message.\"\n}\n}\n";
+    string message = "{\n"
+    "  \"content\": \"CO SE SMEJETE DEBILCI\",\n"
+    "  \"tts\": false,\n"
+    "  \"embed\": \"\"\n"
+    "}";
+    int size = message.length();
+    string c = to_string(size);
+
+    string req;
+    req.append("POST /api/channels/720745314209890379/messages HTTP/1.1\r\n"
+"Host: discord.com\r\n"
+"Authorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\n"
+"Content-Length: ");
+req.append(c);
+req.append("\r\n"
+"Content-Type: application/json\r\n"
+"Cache-Control: no-cache\r\n"
+"Postman-Token: f4b2e754-2b42-a134-185c-5a2cdc686c6f\r\n"
+"\r\n");
+    req.append(message);
+    SendPacket(req);
+
+    char buf[200];
+    int len = 100;
+
+    while (1)
+    {
+        len = SSL_read(ssl, buf, 100);
+        buf[len] = 0;
+        printf("%s",buf);
+    }
+    
+}
+
 int main(int argc, char *argv[])
 {
     initSSL();
+
+    postMessage();
 
     int counter = 0;
     int recvReturnCode = 0;
@@ -540,7 +578,7 @@ int main(int argc, char *argv[])
     {
         requestChannelInfo();
         string msId = parseChannelInfo();
-
+         
         if (lastMessgeId.empty())
         {
             printf("seting new msid \n");
