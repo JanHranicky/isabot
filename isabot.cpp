@@ -530,14 +530,20 @@ string getChannelMessages() {
     }   
 }
 
-void postMessage() {
+bool postMessage(string message) {
     string request = "POST /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nContent-Type: application/json\r\nContent-Length: 153\r\nCache-Control: no-cache\r\n\r\n{\"content\": \"Hello, World!\",\n\"tts\": false,\n\"embed\": {\n\"title\": \"Hello, Embed!\",\n\"description\": \"This is an embedded message.\"\n}\n}\n";
-    string message = "{\n"
-    "  \"content\": \"CO SE SMEJETE DEBILCI\",\n"
-    "  \"tts\": false,\n"
-    "  \"embed\": \"\"\n"
-    "}";
-    int size = message.length();
+    
+    string messageJson = "{\n"
+    "  \"content\": \"";
+    messageJson.append(message);
+    messageJson.append("\",\n"
+    " \"tts\": false,\n"
+    " \"embed\": \"\"\n"
+    "}");
+    
+    printf("%s",messageJson.c_str());
+
+    int size = messageJson.length();
     string c = to_string(size);
 
     string req;
@@ -551,26 +557,54 @@ req.append("\r\n"
 "Cache-Control: no-cache\r\n"
 "Postman-Token: f4b2e754-2b42-a134-185c-5a2cdc686c6f\r\n"
 "\r\n");
-    req.append(message);
+    req.append(messageJson);
+
     SendPacket(req);
 
     char buf[200];
     int len = 100;
+
+    bool code200OK = true;
+    bool checkedHead = false;
 
     while (1)
     {
         len = SSL_read(ssl, buf, 100);
         buf[len] = 0;
         printf("%s",buf);
+
+        if (!checkedHead)
+        {
+            if (!check200OK(convertToString(buf,len)))
+            {
+                code200OK = false;
+            }
+            checkedHead = true;
+        }
+        else {
+            if (checkEndOfMessage(convertToString(buf,len)))
+            {
+                return code200OK;
+            }      
+        }
+    }   
+}   
+
+bool isBot(string userName) {
+    std::regex botRegex("bot");
+
+    if (std::regex_search(userName,botRegex))
+    {
+        return true;
     }
     
+    return false;
 }
 
 int main(int argc, char *argv[])
 {
     initSSL();
 
-    postMessage();
 
     int counter = 0;
     int recvReturnCode = 0;
@@ -582,10 +616,6 @@ int main(int argc, char *argv[])
         if (lastMessgeId.empty())
         {
             printf("seting new msid \n");
-            lastMessgeId = msId;
-        }
-        else if(lastMessgeId != msId){
-            printf("new messages \n");
             requestChannelMessages();
             string messages = getChannelMessages();
             if (!messages.empty()) //react to all messages
@@ -597,8 +627,46 @@ int main(int argc, char *argv[])
                 for (auto const& pair : parsedMsg) {
                     auto key = pair.first;
                     printf("msgid : %s content : %s username : %s \n",key.c_str(),pair.second.at(0).c_str(),pair.second.at(1).c_str());
-                    // etc. etc.
-                }      
+                    if (!isBot(pair.second.at(1).c_str()))
+                    {
+                        do
+                        {
+                        } while (!postMessage(pair.second.at(0)));
+                    }
+                }
+                lastMessgeId = msId;     
+            }
+
+        }
+        else if(lastMessgeId != msId){
+            printf("new messages \n");
+            requestChannelMessages();
+            string messages = getChannelMessages();
+            if (!messages.empty()) //react to all messages
+            {
+                printf("%s",messages.c_str());
+                printf("seting new msid \n");
+                std::map<string,std::vector<string>> parsedMsg = parseMessages(messages);
+
+                bool startResponding = false;
+                for (auto const& pair : parsedMsg) {
+                    auto key = pair.first;
+                    printf("msgid : %s content : %s username : %s \n",key.c_str(),pair.second.at(0).c_str(),pair.second.at(1).c_str());
+                    if (lastMessgeId == key.c_str())
+                    {
+                        startResponding = true;
+                    }
+                    if (startResponding)
+                    {
+                        if (!isBot(pair.second.at(1).c_str()))
+                        {
+                            do
+                            {
+                            } while (!postMessage(pair.second.at(0)));
+                        }
+                    }
+                }
+                lastMessgeId = msId;     
             }
             //check new msg count
         }
