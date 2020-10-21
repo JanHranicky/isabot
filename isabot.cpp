@@ -19,6 +19,7 @@
 #include <vector>
 #include <string>
 #include <regex>
+#include <unistd.h>
 #include <iostream>
 
 #include "jsonParser.hpp"
@@ -29,6 +30,8 @@ SSL *ssl;
 int sock;
 int timeout = 1000;
 int finalLen = 0;
+
+int reqFrequency = 3000;
 
 string lastMessgeId;
 string stopMessage;
@@ -610,6 +613,7 @@ int main(int argc, char *argv[])
     int recvReturnCode = 0;
     while (1)
     {
+        printf("zacatek cyklu \n");
         requestChannelInfo();
         string msId = parseChannelInfo();
          
@@ -636,7 +640,7 @@ int main(int argc, char *argv[])
                 }
                 lastMessgeId = msId;     
             }
-
+            printf("new msid set ! \n");
         }
         else if(lastMessgeId != msId){
             printf("new messages \n");
@@ -668,6 +672,7 @@ int main(int argc, char *argv[])
                 }
                 lastMessgeId = msId;     
             }
+            printf("reacted to new messages\n");
             //check new msg count
         }
         /*
@@ -692,6 +697,8 @@ int main(int argc, char *argv[])
         counter++;
         printf("end of loop %i\n", counter);
         */
+       printf("konec cyklu going to sleep for 3s \n");
+       usleep(reqFrequency);
     }
 
     return 0;
