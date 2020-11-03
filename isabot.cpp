@@ -31,7 +31,7 @@ int sock;
 int timeout = 1000;
 int finalLen = 0;
 
-int reqFrequency = 3000;
+int reqFrequency = 1; //3000 ms = 3s
 
 string lastMessgeId;
 string stopMessage;
@@ -618,7 +618,7 @@ int main(int argc, char *argv[])
         string msId = parseChannelInfo();
          
         if (lastMessgeId.empty())
-        {
+        {   /*
             printf("seting new msid \n");
             requestChannelMessages();
             string messages = getChannelMessages();
@@ -638,8 +638,9 @@ int main(int argc, char *argv[])
                         } while (!postMessage(pair.second.at(0)));
                     }
                 }
-                lastMessgeId = msId;     
             }
+                */
+                lastMessgeId = msId;     
             printf("new msid set ! \n");
         }
         else if(lastMessgeId != msId){
@@ -656,18 +657,18 @@ int main(int argc, char *argv[])
                 for (auto const& pair : parsedMsg) {
                     auto key = pair.first;
                     printf("msgid : %s content : %s username : %s \n",key.c_str(),pair.second.at(0).c_str(),pair.second.at(1).c_str());
-                    if (lastMessgeId == key.c_str())
-                    {
-                        startResponding = true;
-                    }
                     if (startResponding)
                     {
                         if (!isBot(pair.second.at(1).c_str()))
                         {
-                            do
-                            {
-                            } while (!postMessage(pair.second.at(0)));
+                            while (!postMessage(pair.second.at(0))) {
+                                
+                            }
                         }
+                    }
+                    if (lastMessgeId == key.c_str())
+                    {
+                        startResponding = true;
                     }
                 }
                 lastMessgeId = msId;     
@@ -698,7 +699,7 @@ int main(int argc, char *argv[])
         printf("end of loop %i\n", counter);
         */
        printf("konec cyklu going to sleep for 3s \n");
-       usleep(reqFrequency);
+       sleep(reqFrequency);
     }
 
     return 0;

@@ -55,16 +55,20 @@ std::pair<int,string> betweenTest(std::string const &in,
     }
     std::vector<string> msgContent;
     msgContent.push_back(between(pomMessages,beforeContent,afterContent));
-    msgContent.push_back(between(pomMessages,beforeUserName,afterUserName));
+
+    std::pair<int,string> returnUsername = betweenTest(pomMessages,beforeUserName,afterUserName);
+    msgContent.push_back(returnUsername.second);
+    
+    //msgContent.push_back(between(pomMessages,beforeUserName,afterUserName));
 
     parsedMessages.emplace(std::make_pair(returnPair.second,msgContent));
 
     //ids.push_back(returnPair.second);
 
-    pomMessages = pomMessages.substr(returnPair.first,pomMessages.length());
+    pomMessages = pomMessages.substr(returnUsername.first,pomMessages.length());
     //printf("%s \n\n",pomMessages.c_str());
     //printf("vector size : %i\n",ids.size());
-    beg = returnPair.first;
+    beg = returnUsername.first;
     size = pomMessages.size();
   }
     
