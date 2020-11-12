@@ -1,7 +1,15 @@
 #include"jsonParser.hpp"
 
 string getLastMessageId(string jsonResponse) {
-    string stringId = between(jsonResponse,"\"last_message_id\": \"","\", \"last_pin_timestamp");
+
+    string id = executeRegex(std::regex("\"last_message_id\": \"[0-9]+\","),jsonResponse);
+    id = executeRegex(std::regex("[0-9]+"),id);
+    return id;
+    
+}
+
+string parseGuildId(string jsonResponse) {
+    string stringId = between(jsonResponse,"\"id\": \"","\", \"name\":");
     return stringId;
 }
 
@@ -73,4 +81,19 @@ std::pair<int,string> betweenTest(std::string const &in,
   }
     
   return parsedMessages;
+}
+
+std::string executeRegex(std::regex regex, const std::string s) {
+  std::smatch match;
+    if (regex_search(s.begin(), s.end(), match, regex))
+      return match[0];
+  return NULL;
+}
+
+std::string parseChannels(string jsonResponse) {
+
+  string idString =  executeRegex(std::regex("\\{.{0,100}isabot"),jsonResponse);
+  idString = executeRegex(std::regex("\"id\": \"[0-9]*\""),idString);
+  string id = executeRegex(std::regex("[0-9]+"),idString);
+  return id;
 }

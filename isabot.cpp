@@ -1,293 +1,14 @@
-
-//============================================================================
-// Name        : SSLClient.cpp
-// Compiling   : g++ -c -o SSLClient.o SSLClient.cpp
-//               g++ -o SSLClient SSLClient.o -lssl -lcrypto
-//============================================================================
-#include <stdio.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#include <string.h>
-#include <netinet/tcp.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <vector>
-#include <string>
-#include <regex>
-#include <unistd.h>
-#include <iostream>
-
+#include "isabot.hpp"
 #include "jsonParser.hpp"
-
-using namespace std;
 
 SSL *ssl;
 int sock;
-int timeout = 1000;
-int finalLen = 0;
+string guildId;
+string channelId;
 
-int reqFrequency = 1; //3000 ms = 3s
+int reqFrequency = 1; //1s
 
 string lastMessgeId;
-string stopMessage;
-
-bool goodCode = true;
-
-bool checkCR(char c)
-{
-    if (c == 13) //CR = 13 ASCII
-    {
-        return true;
-    }
-    return false;
-}
-
-bool checkLF(char c)
-{
-    if (c == 10) //LF = 10 ASCII
-    {
-        return true;
-    }
-    return false;
-}
-
-bool checkZero(char c)
-{
-    if (c == 48)
-    {
-        return true;
-    }
-    return false;
-}
-
-void checkForBegginingOfJson(char *buf, int len, string *jsonResponse)
-{
-    bool inJson = false;
-
-    for (size_t i = 0; i < len; i++)
-    {
-        if (buf[i] == '[' || buf[i] == '{' || inJson)
-        {
-            jsonResponse->push_back(buf[i]);
-            inJson = true;
-        }
-    }
-}
-
-//CRLFCRLF
-bool checkEndOfHead(char *buf, int len, string *jsonResponse)
-{
-    for (size_t i = 0; i < len; i++)
-    {
-        if (checkCR(buf[i]) && i + 3 < len)
-        {
-            if (checkLF(buf[i + 1]))
-            {
-                if (checkCR(buf[i + 2]))
-                {
-                    if (checkLF(buf[i + 3]))
-                    {
-                        finalLen += len;
-                        checkForBegginingOfJson(buf, len, jsonResponse);
-                        //printf("%s",buf);
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-//0CRLFCRLF
-bool checkEndOfMessage(char *buf, int len)
-{
-    for (size_t i = 0; i < len; i++)
-    {
-        if (checkZero(buf[i]) && i + 4 < len)
-        {
-            if (checkCR(buf[i + 1]))
-            {
-                if (checkLF(buf[i + 2]))
-                {
-                    if (checkCR(buf[i + 3]))
-                    {
-                        if (checkLF(buf[i + 4]))
-                        {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-
-void addToJsonResonse(char *buf, int len, string *jsonResponse)
-{
-    for (size_t i = 0; i < len; i++)
-    {
-        jsonResponse->push_back(buf[i]);
-    }
-}
-
-bool parseHead(char *buf, int len, string returnCode)
-{ //9  10 11
-    string returnCodeString = "";
-    returnCodeString.push_back(buf[9]);
-    returnCodeString.push_back(buf[10]);
-    returnCodeString.push_back(buf[11]);
-
-    if (returnCodeString == returnCode)
-    {
-        return true;
-    }
-    return false;
-}
-
-bool checkNewMessages(string jsonResponse)
-{
-    string newLast = getLastMessageId(jsonResponse);
-    if (lastMessgeId.empty())
-    {
-        lastMessgeId = newLast;
-    }
-    else
-    {
-        if (lastMessgeId != newLast)
-        {
-            printf("GOING TO READ NEW MESSAGES \n\n");
-            stopMessage = lastMessgeId;
-            lastMessgeId = newLast;
-
-            printf("last message : %s\n", lastMessgeId.c_str());
-            printf("stop message : %s\n", stopMessage.c_str());
-            return true; //get new messages
-        }
-    }
-    return false;
-}
-
-bool checkCRLFCRLF(char *buf, int len)
-{
-    for (size_t i = 0; i < len; i++)
-    {
-        if (checkCR(buf[i + 1]))
-        {
-            if (checkLF(buf[i + 2]))
-            {
-                if (checkCR(buf[i + 3]))
-                {
-                    if (checkLF(buf[i + 4]))
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-
-void readRestOfFailedResponse()
-{
-    char buf[150];
-    int len = 100;
-
-    bool readingHead = true;
-    bool readLenght = false;
-    string head;
-    string contentLenght;
-    string test;
-    while (1)
-    {
-        len = SSL_read(ssl, buf, 100);
-        buf[len] = 0;
-
-        if (checkCRLFCRLF(buf, len))
-        {
-            if (checkCRLFCRLF(buf, len))
-            {
-                return;
-            }
-        }
-    }
-}
-
-string RecvPacket()
-{
-    string jsonResponse;
-    int len = 100;
-    char buf[1000000];
-
-    bool bodyFlag = false;
-    bool parsedHead = false;
-    while (1)
-    {
-        len = SSL_read(ssl, buf, 100);
-        buf[len] = 0;
-        //printf("%s",buf);
-
-        if (!bodyFlag)
-        {
-            if (!parsedHead)
-            {
-                if (!parseHead(buf, len, "200"))
-                {
-                    goodCode = false;
-                    //printf("%s",buf);
-                    //printf("BREAKING CAUSE OF BAD CODE \n\n\n");
-                    //TODO READ MSG ON SOCKET)
-                    readRestOfFailedResponse();
-                    break;
-                }
-                goodCode = true;
-                parsedHead = true;
-            }
-
-            if (checkEndOfHead(buf, len, &jsonResponse))
-            {
-                bodyFlag = true;
-            }
-        }
-        else
-        {
-            if (checkEndOfMessage(buf, len) || len < 0)
-            {
-                break;
-            }
-            else
-            {
-                finalLen += len;
-                addToJsonResonse(buf, len, &jsonResponse);
-                //printf("%s",jsonResponse.c_str());
-            }
-        }
-    }
-    //printf("finallen je : %i + velikost vectoru je : %i\n",finalLen,jsonResponse.size());
-    //printf("\n\nfinished reading \nGoing to parseing \n");
-
-    return jsonResponse;
-
-    //printf("%s <- last message id \n",getLastMessageId(jsonResponse).c_str());
-
-    /*
-    if (len < 0) {
-        int err = SSL_get_error(ssl, len);
-    if (err == SSL_ERROR_WANT_READ)
-            return 0;
-        if (err == SSL_ERROR_WANT_WRITE)
-            return 0;
-        if (err == SSL_ERROR_ZERO_RETURN || err == SSL_ERROR_SYSCALL || err == SSL_ERROR_SSL)
-            return -1;
-    }
-*/
-}
 
 int SendPacket(string request)
 {
@@ -310,6 +31,8 @@ int SendPacket(string request)
             return -1;
         }
     }
+
+    return 0;
 }
 
 void log_ssl()
@@ -371,40 +94,14 @@ void initSSL()
     printf("SSL connection using %s\n", SSL_get_cipher(ssl));
 }
 
-int countNewMessages(std::vector<string> messageVector)
-{
-    for (size_t i = 0; i < messageVector.size(); i++)
-    {
-        if (messageVector.at(i) == stopMessage)
-        {
-            return i;
-        }
-    }
-    return messageVector.size();
-}
-
 void requestChannelInfo() {
-    string request = "GET /api/channels/720745314209890379 HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
+    string request = "GET /api/channels/"+channelId+" HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
     SendPacket(request);
 }
 
 void requestChannelMessages() {
-    string request = "GET /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
+    string request = "GET /api/channels/"+channelId+"/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
     SendPacket(request);
-}
-
-string getFirstLine(char buf[]) {
-    
-    string s = "";
-    int counter = 0;
-
-    while (buf[counter] != 10)
-    {
-        s += buf[counter];
-        counter ++;
-    }
-
-    return s;
 }
 
 bool check200OK(string s) {
@@ -534,7 +231,7 @@ string getChannelMessages() {
 }
 
 bool postMessage(string message) {
-    string request = "POST /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nContent-Type: application/json\r\nContent-Length: 153\r\nCache-Control: no-cache\r\n\r\n{\"content\": \"Hello, World!\",\n\"tts\": false,\n\"embed\": {\n\"title\": \"Hello, Embed!\",\n\"description\": \"This is an embedded message.\"\n}\n}\n";
+    string request = "POST /api/channels/"+channelId+"/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nContent-Type: application/json\r\nContent-Length: 153\r\nCache-Control: no-cache\r\n\r\n{\"content\": \"Hello, World!\",\n\"tts\": false,\n\"embed\": {\n\"title\": \"Hello, Embed!\",\n\"description\": \"This is an embedded message.\"\n}\n}\n";
     
     string messageJson = "{\n"
     "  \"content\": \"";
@@ -544,13 +241,13 @@ bool postMessage(string message) {
     " \"embed\": \"\"\n"
     "}");
     
-    printf("%s",messageJson.c_str());
+    //printf("%s",messageJson.c_str());
 
     int size = messageJson.length();
     string c = to_string(size);
 
     string req;
-    req.append("POST /api/channels/720745314209890379/messages HTTP/1.1\r\n"
+    req.append("POST /api/channels/"+channelId+"/messages HTTP/1.1\r\n"
 "Host: discord.com\r\n"
 "Authorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\n"
 "Content-Length: ");
@@ -604,10 +301,94 @@ bool isBot(string userName) {
     return false;
 }
 
+void proccessArguments(int argc,char *argv[]) {
+    int c;
+
+    while ((c = getopt (argc, argv, "hvt:")) != -1)
+    switch (c)
+      {
+      case 'h':
+        printf("Printin help\n");
+        exit(0);
+        break;
+      case 'v':
+        printf("Procceding to print message I am reacting to\n");
+        break;
+      case 't':
+        printf("option -c argument : %s\n",optarg);
+        break;
+      case '?':
+        if (optopt == 't') {
+          fprintf (stderr, "Option -%c requires bot access token\n", optopt);
+          exit(-1);
+        }
+        else if (isprint (optopt))
+          fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+        else
+          fprintf (stderr,
+                   "Unknown option character `\\x%x'.\n",
+                   optopt);
+        break;
+      default:
+        abort ();
+      } 
+}
+
+string getGuildId() {
+    string request = "GET /api/users/@me/guilds HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
+    SendPacket(request);
+
+    string response;
+    char buf[101];
+    int len = 100;
+
+    while (1)
+    {   
+        len = SSL_read(ssl, buf, 100);
+        buf[len] = 0;
+        response += convertToString(buf,len);
+        if (checkEndOfMessage(convertToString(buf,len)))
+        {
+            break;
+        }     
+    }
+
+    return parseGuildId(response);
+}
+
+void setChannelId() {
+    string request = "GET /api/guilds/"+guildId+"/channels HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
+    printf("%s",request.c_str());
+    SendPacket(request);
+
+    string response;
+    char buf[101];
+    int len = 100;
+
+    while (1)
+    {   
+        len = SSL_read(ssl, buf, 100);
+        buf[len] = 0;
+        //printf("%s",buf);
+        response += convertToString(buf,len);
+        if (checkEndOfMessage(convertToString(buf,len)))
+        {
+            break;
+        }     
+    }
+
+    channelId = parseChannels(response);    
+}
+
 int main(int argc, char *argv[])
 {
+    proccessArguments(argc,argv);
     initSSL();
 
+    guildId = getGuildId();
+    printf("guild id je : %s\n",guildId.c_str());
+    setChannelId();
+    printf("channle if je : %s\n",channelId.c_str());
 
     int counter = 0;
     int recvReturnCode = 0;
@@ -616,88 +397,48 @@ int main(int argc, char *argv[])
         printf("zacatek cyklu \n");
         requestChannelInfo();
         string msId = parseChannelInfo();
+        printf("msid z channel infa je %s \n",msId.c_str());
+        requestChannelMessages();
+        string messages = getChannelMessages();
          
         if (lastMessgeId.empty())
-        {   /*
-            printf("seting new msid \n");
-            requestChannelMessages();
-            string messages = getChannelMessages();
-            if (!messages.empty()) //react to all messages
-            {
-                printf("%s",messages.c_str());
-                printf("seting new msid \n");
-                std::map<string,std::vector<string>> parsedMsg = parseMessages(messages);
-
-                for (auto const& pair : parsedMsg) {
-                    auto key = pair.first;
-                    printf("msgid : %s content : %s username : %s \n",key.c_str(),pair.second.at(0).c_str(),pair.second.at(1).c_str());
-                    if (!isBot(pair.second.at(1).c_str()))
-                    {
-                        do
-                        {
-                        } while (!postMessage(pair.second.at(0)));
-                    }
-                }
-            }
-                */
-                lastMessgeId = msId;     
+        {   
+            lastMessgeId = msId;     
             printf("new msid set ! \n");
         }
         else if(lastMessgeId != msId){
+            printf("porovnavam %s a %s \n",lastMessgeId.c_str(),msId.c_str());
             printf("new messages \n");
-            requestChannelMessages();
-            string messages = getChannelMessages();
             if (!messages.empty()) //react to all messages
             {
-                printf("%s",messages.c_str());
-                printf("seting new msid \n");
+                //printf("%s",messages.c_str());
                 std::map<string,std::vector<string>> parsedMsg = parseMessages(messages);
 
                 bool startResponding = false;
                 for (auto const& pair : parsedMsg) {
                     auto key = pair.first;
-                    printf("msgid : %s content : %s username : %s \n",key.c_str(),pair.second.at(0).c_str(),pair.second.at(1).c_str());
                     if (startResponding)
                     {
+                        //printf("isabot - %s: %s\n",key);
+                        printf("msgid : %s content : %s username : %s \n",key.c_str(),pair.second.at(0).c_str(),pair.second.at(1).c_str());
                         if (!isBot(pair.second.at(1).c_str()))
                         {
                             while (!postMessage(pair.second.at(0))) {
-                                
                             }
                         }
+                        lastMessgeId = key;     
                     }
                     if (lastMessgeId == key.c_str())
                     {
+                        printf("RESPOND FLAG TRUE \n");
                         startResponding = true;
                     }
                 }
-                lastMessgeId = msId;     
             }
             printf("reacted to new messages\n");
+            printf("seting new msid : %s\n",msId.c_str());
             //check new msg count
         }
-        /*
-        string jsonResponse = RecvPacket();
-
-        if (goodCode && checkNewMessages(jsonResponse))
-        {
-            string request = "GET /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n";
-            SendPacket(request);
-            string messages = RecvPacket();
-            std::vector<string> messageVector = parseMessages(messages);
-            printf("new messages : %i \n", countNewMessages(messageVector));
-            //printf("%s", messages.c_str());
-        }
-        /*
-        else if (recvReturnCode == 1)
-        {
-            string request = "GET /api/channels/720745314209890379/messages HTTP/1.1\r\nHost: discord.com\r\nAuthorization: Bot NzYyMTAyODE1MjQxNjY2NTkw.X3kRjg.DJE2YvnLBS77t6x6POlYO8xOX_I\r\nUser-Agent: DiscordBot ($url, $versionNumber)\r\n\r\n"; 
-            SendPacket(request);
-            recvReturnCode = RecvPacket();
-        }
-        counter++;
-        printf("end of loop %i\n", counter);
-        */
        printf("konec cyklu going to sleep for 3s \n");
        sleep(reqFrequency);
     }
