@@ -4,16 +4,13 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#include <string.h>
 #include <netinet/tcp.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <vector>
 #include <string>
 #include <regex>
-#include <unistd.h>
 #include <iostream>
 #include <getopt.h>
 
