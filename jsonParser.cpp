@@ -9,6 +9,14 @@ string getLastMessageId(string jsonResponse) {
 }
 
 string parseGuildId(string jsonResponse) {
+
+    std::vector<string> splitResponse = splitString(jsonResponse,"\r\n\r\n");
+    if (splitResponse.size() == 1) //bot is in no guild
+    {
+      fprintf(stderr,"Bot isn't in any guild, please add bot to your guild and restart.\n");
+      exit(EXIT_FAILURE);
+    }
+    
     string id = executeRegex(std::regex("\"id\": \"[0-9]+\","),jsonResponse);
     id = executeRegex(std::regex("[0-9]+"),id);
     return id;
@@ -91,11 +99,18 @@ std::string executeRegex(std::regex regex, const std::string s) {
   std::smatch match;
     if (regex_search(s.begin(), s.end(), match, regex))
       return match[0];
-  return NULL;
+  return "";
 }
 
 std::string parseChannels(string jsonResponse) {
-  string idString =  executeRegex(std::regex("\\{.{0,100}isabot"),jsonResponse);
+  string idString =  executeRegex(std::regex("\\{.{0,100}isa-bot"),jsonResponse);
+  
+  if (idString.empty())
+  {
+    fprintf(stderr,"There is no channel named '#isa-bot' on your guild, please add one and restart \n");
+    exit(EXIT_FAILURE);
+  }
+  
   idString = executeRegex(std::regex("\"id\": \"[0-9]*\""),idString);
   string id = executeRegex(std::regex("[0-9]+"),idString);
   return id;
