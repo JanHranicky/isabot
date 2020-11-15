@@ -10,3 +10,4 @@ std::string between(std::string const &in,std::string const &before, std::string
 std::map<string,std::vector<string>> parseMessages(string jsonMessages);
 std::string parseChannels(string jsonResponse);
 std::string executeRegex(std::regex regex, const std::string s);
+std::vector<std::string> extractAllRegexPatterns(string s, regex r); 

@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/bio.h>
 #include <netinet/tcp.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -13,6 +14,7 @@
 #include <regex>
 #include <iostream>
 #include <getopt.h>
+#include <malloc.h>
 
 using namespace std;
 
@@ -32,3 +34,4 @@ bool isBot(string userName); //check for bot substring in username
 void proccessArguments(int argc,char *argv[]); //proccessing arguments
 string getGuildId(); //gets guild id from discord api
 void setChannelId(); //gets isabot channel id using guild id
+string sendRqAndGetResponse(string request);
