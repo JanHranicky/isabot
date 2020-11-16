@@ -1,6 +1,6 @@
 #include"jsonParser.hpp"
 
-string getLastMessageId(string jsonResponse) {
+string parseLastMessageId(string jsonResponse) {
 
     string id = executeRegex(std::regex("\"last_message_id\": \"[0-9]+\","),jsonResponse);
     id = executeRegex(std::regex("[0-9]+"),id);
@@ -114,4 +114,46 @@ std::string parseChannels(string jsonResponse) {
   idString = executeRegex(std::regex("\"id\": \"[0-9]*\""),idString);
   string id = executeRegex(std::regex("[0-9]+"),idString);
   return id;
+}
+
+string convertToString(char buf[],int len) {
+    string converted;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        converted.push_back(buf[i]);
+    }
+
+    return converted;
+}
+
+std::vector<string> splitString(string s, string delimiter) {
+    std::vector<string> returnVector;
+    int pos = 0;
+    string token;
+
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token = s.substr(0, pos);
+        returnVector.push_back(token);
+        s.erase(0, pos + delimiter.length());
+    }
+
+    return returnVector;
+}
+
+string extractResponseCode(string s) {
+    string code = executeRegex(regex("^HTTP\\/1.1\\s(\\d+)"),s);
+    code = executeRegex(regex("\\d{3}"),code);
+    return code;
+}
+
+bool isBot(string userName) {
+    std::regex botRegex("bot");
+
+    if (std::regex_search(userName,botRegex))
+    {
+        return true;
+    }
+    
+    return false;
 }
