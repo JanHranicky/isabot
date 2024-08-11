@@ -7,7 +7,7 @@ super simple discord bot whose only job is to copy paste the message you type in
 
 Build using:
 
-    `make`    
+    make    
 
 Run it:
 
