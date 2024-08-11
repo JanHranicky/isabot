@@ -1,29 +1,17 @@
-Discord bot 
+# Discord bot
 
-    jednoduchý discord bot, který odpovídá na zprávy uživatelům opětovným zasláním jejich zprávy.
+super simple discord bot whose only job is to copy paste the message you type in a channel it is monitoring. The goal of this project was not to code a bot, but rather learn the SSL communication from the bottom up, while high level libraries can do this using a single function call, the network communication in this repository is coded to the last bit.
 
-Překlad:
 
-    make    
+## Running the bot
 
-Spuštění:
+Build using:
+
+    `make`    
+
+Run it:
 
     ./isabot [-v] [-h] -t bot_token
-        -v výpise zpráv, na které bot reaguej na konzoli
-        -h výpis nápovědi
-        -t bot_token dodaný uživatele pro komunikaci s Discord API 
-
-
-Seznam odevzdaných souborů:
-
-argumentParser.cpp
-argumentParser.hpp
-httpsClient.cpp
-httpsClient.hpp
-isabot.cpp 
-isabot.hpp 
-jsonParser.cpp 
-jsonParser.hpp
-Makefile
-manual.pdf
-README
+        -v debugs the messages the bot responds to into terminal
+        -h help
+        -t bot_token discord API token needed for the communication 
